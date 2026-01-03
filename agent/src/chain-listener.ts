@@ -1,11 +1,11 @@
 import { ethers } from 'ethers';
 // This ABI is a placeholder. You will need to replace it with the actual ABI of your PaymentStream contract
 const paymentStreamABI = [
-    "event StreamStarted(string deviceId, address indexed buyer, address indexed provider, uint256 rate)"
+    "event StreamStarted(string indexed deviceId, address indexed buyer, address indexed provider, uint256 rate, uint256 deposit, uint256 timestamp)"
 ];
 
-// This would be the address of your deployed PaymentStream contract on Cronos
-const paymentStreamAddress = "YOUR_PAYMENT_STREAM_CONTRACT_ADDRESS"; 
+// Deployed PaymentStream contract address on Cronos Testnet
+const paymentStreamAddress = "0xA5dd225Beb2Ec0009Fe143eb0B9309Ba07d23737"; 
 
 // A placeholder for the Cronos testnet provider
 const provider = new ethers.providers.JsonRpcProvider("https://evm-t3.cronos.org");
