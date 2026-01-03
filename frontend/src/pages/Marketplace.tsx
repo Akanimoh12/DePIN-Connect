@@ -11,6 +11,7 @@ import { Badge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
 import { useWallet } from '../contexts/WalletContext';
+import { useToast } from '../contexts/ToastContext';
 import { dePINRegistry } from '../config';
 import { 
   MagnifyingGlassIcon, 
@@ -33,7 +34,8 @@ interface Device {
 }
 
 const Marketplace = () => {
-  const { provider } = useWallet();
+  const { provider, isCorrectNetwork, switchToCorrectNetwork, account } = useWallet();
+  const { showToast } = useToast();
   const [devices, setDevices] = useState<Device[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
@@ -63,41 +65,81 @@ const Marketplace = () => {
       const total = await contract.totalDevices();
       setTotalDevices(Number(total));
 
-      // For demo purposes, we'll fetch devices from the provider's devices
-      // In production, you'd use events or a backend indexer
+      // Fetch devices using events (production approach)
       const devicesList: Device[] = [];
       
-      // Try to fetch some sample devices (this is a simplified approach)
-      // You should enhance this with event listening or backend API
-      const sampleDeviceIds = ['weather-station-001', 'sensor-001', 'iot-device-001'];
-      
-      for (const deviceId of sampleDeviceIds) {
-        try {
-          const deviceData = await contract.getDevice(deviceId);
-          if (deviceData.owner !== ethers.ZeroAddress) {
-            devicesList.push({
-              deviceId,
-              owner: deviceData.owner,
-              dataSchema: deviceData.dataSchema,
-              isActive: deviceData.isActive,
-              registeredAt: Number(deviceData.registeredAt),
-              coordinates: getRandomCoordinates(),
-              activeSubscribers: Math.floor(Math.random() * 10),
-              price: '1000000000000000', // 0.001 CRO/sec
-            });
+      try {
+        // Query DeviceRegistered events from the past (last 100,000 blocks)
+        const currentBlock = await provider.getBlockNumber();
+        const fromBlock = Math.max(0, currentBlock - 100000);
+        
+        const filter = contract.filters.DeviceRegistered();
+        const events = await contract.queryFilter(filter, fromBlock, 'latest');
+        
+        console.log(`Found ${events.length} DeviceRegistered events`);
+        
+        // Get unique device IDs from events
+        const deviceIds = new Set<string>();
+        events.forEach((event: any) => {
+          if (event.args && event.args.deviceId) {
+            deviceIds.add(event.args.deviceId);
           }
-        } catch (error) {
-          // Device doesn't exist, skip
+        });
+        
+        // Fetch current data for each device
+        for (const deviceId of deviceIds) {
+          try {
+            const deviceData = await contract.getDevice(deviceId);
+            if (deviceData.owner !== ethers.ZeroAddress) {
+              devicesList.push({
+                deviceId,
+                owner: deviceData.owner,
+                dataSchema: deviceData.dataSchema,
+                isActive: deviceData.isActive,
+                registeredAt: Number(deviceData.registeredAt),
+                coordinates: getRandomCoordinates(),
+                activeSubscribers: Math.floor(Math.random() * 10),
+                price: '1000000000000000', // 0.001 CRO/sec
+              });
+            }
+          } catch (error) {
+            console.error(`Error fetching device ${deviceId}:`, error);
+          }
+        }
+      } catch (eventError) {
+        console.error('Error querying events, falling back to sample data:', eventError);
+        // Fallback: Try to fetch some hardcoded sample devices for testing
+        const sampleDeviceIds = ['weather-station-001', 'sensor-001', 'iot-device-001', 'air-quality-monitor', 'traffic-sensor'];
+        
+        for (const deviceId of sampleDeviceIds) {
+          try {
+            const deviceData = await contract.getDevice(deviceId);
+            if (deviceData.owner !== ethers.ZeroAddress) {
+              devicesList.push({
+                deviceId,
+                owner: deviceData.owner,
+                dataSchema: deviceData.dataSchema,
+                isActive: deviceData.isActive,
+                registeredAt: Number(deviceData.registeredAt),
+                coordinates: getRandomCoordinates(),
+                activeSubscribers: Math.floor(Math.random() * 10),
+                price: '1000000000000000', // 0.001 CRO/sec
+              });
+            }
+          } catch (error) {
+            // Device doesn't exist, skip
+          }
         }
       }
 
       setDevices(devicesList);
       
-      // Calculate active streams (mock for now)
+      // Calculate active streams
       const activeCount = devicesList.filter(d => d.isActive).length;
       setActiveStreams(activeCount);
     } catch (error) {
       console.error('Error fetching devices:', error);
+      showToast('Failed to fetch devices', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -135,6 +177,28 @@ const Marketplace = () => {
         onClose={handleCloseModal}
         device={selectedDevice}
       />
+
+      {/* Network Warning Banner */}
+      {account && !isCorrectNetwork && (
+        <Card className="border-red-500/50 bg-red-500/10">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-red-500/20 p-2 rounded-lg">
+                <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-white font-medium">Wrong Network Detected</p>
+                <p className="text-gray-400 text-sm">Please switch to Cronos Testnet to subscribe to devices.</p>
+              </div>
+            </div>
+            <Button onClick={switchToCorrectNetwork} variant="danger" size="sm">
+              Switch Network
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Hero Section */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 p-8 lg:p-12 shadow-2xl">

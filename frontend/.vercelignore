@@ -1,0 +1,17 @@
+# Ignore development files
+node_modules
+.env
+.env.local
+
+# Ignore git
+.git
+.gitignore
+
+# Ignore build artifacts from other directories
+contract/
+agent/
+
+# Ignore development configs
+.vscode
+.idea
+*.log

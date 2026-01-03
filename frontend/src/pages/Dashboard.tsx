@@ -28,7 +28,7 @@ interface Device {
 }
 
 const Dashboard = () => {
-  const { account, provider } = useWallet();
+  const { account, provider, isCorrectNetwork, switchToCorrectNetwork } = useWallet();
   const { showToast } = useToast();
   const formRef = useRef<HTMLDivElement>(null);
   
@@ -58,27 +58,25 @@ const Dashboard = () => {
     try {
       const contract = new ethers.Contract(dePINRegistry.address, dePINRegistry.abi, provider);
       
-      // Fetch all devices for this provider
-      // Note: This is simplified - in production, use events or indexed database
+      // Get the count of devices for this provider
+      const deviceCount = await contract.getProviderDeviceCount(account);
+      const count = Number(deviceCount);
+      
+      console.log(`Found ${count} devices for provider ${account}`);
+      
       const deviceIds: string[] = [];
       const devicesData: Device[] = [];
       
-      // Try to fetch devices from providerDevices mapping
-      // This is a limitation - we'd need events to track all device IDs properly
-      try {
-        let i = 0;
-        while (i < 100) { // Limit to 100 for safety
-          const deviceIdFromContract = await contract.providerDevices(account, i);
-          if (deviceIdFromContract) {
-            deviceIds.push(deviceIdFromContract);
-            i++;
-          } else {
-            break;
+      // Fetch each device ID from the providerDevices array
+      for (let i = 0; i < count; i++) {
+        try {
+          const deviceId = await contract.providerDevices(account, i);
+          if (deviceId) {
+            deviceIds.push(deviceId);
           }
+        } catch (err) {
+          console.error(`Error fetching device ID at index ${i}:`, err);
         }
-      } catch (err) {
-        // Reached end of array or error
-        console.log('Finished fetching device IDs');
       }
       
       // Fetch details for each device
@@ -122,6 +120,17 @@ const Dashboard = () => {
     
     if (!provider || !account) {
       showToast('Please connect your wallet first', 'warning');
+      return;
+    }
+
+    // Check if on correct network
+    if (!isCorrectNetwork) {
+      showToast('Please switch to Cronos Testnet to register devices', 'error');
+      try {
+        await switchToCorrectNetwork();
+      } catch (err) {
+        console.error("Network switch cancelled or failed", err);
+      }
       return;
     }
     
@@ -168,6 +177,28 @@ const Dashboard = () => {
   return (
     <div className="animate-fade-in">
       <h1 className="text-2xl sm:text-3xl font-bold text-white mb-6 sm:mb-8">Provider Dashboard</h1>
+      
+      {/* Network Warning Banner */}
+      {account && !isCorrectNetwork && (
+        <Card className="mb-6 border-red-500/50 bg-red-500/10">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-red-500/20 p-2 rounded-lg">
+                <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-white font-medium">Wrong Network Detected</p>
+                <p className="text-gray-400 text-sm">Please switch to Cronos Testnet to register devices and interact with contracts.</p>
+              </div>
+            </div>
+            <Button onClick={switchToCorrectNetwork} variant="danger" size="sm">
+              Switch Network
+            </Button>
+          </div>
+        </Card>
+      )}
       
       {/* Stats Overview Section */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">

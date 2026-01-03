@@ -1,16 +1,31 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useWallet } from '../../contexts/WalletContext';
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 
 const Header = () => {
-  const { account, connectWallet, disconnectWallet } = useWallet();
+  const { account, isCorrectNetwork, connectWallet, disconnectWallet, switchToCorrectNetwork } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const truncateAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  const getNetworkBadge = () => {
+    if (!account) return null;
+    
+    if (isCorrectNetwork) {
+      return <Badge variant="success">Cronos Testnet</Badge>;
+    } else {
+      return (
+        <Badge variant="error" className="flex items-center gap-1">
+          <ExclamationTriangleIcon className="w-4 h-4" />
+          Wrong Network
+        </Badge>
+      );
+    }
   };
 
   return (
@@ -31,14 +46,17 @@ const Header = () => {
 
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-4">
-            <Badge variant="info" className="mr-2">
-              Cronos Testnet
-            </Badge>
+            {getNetworkBadge()}
             {account ? (
               <div className="flex items-center space-x-3">
                 <span className="text-white bg-gray-700/50 px-4 py-2 rounded-lg border border-gray-600">
                   {truncateAddress(account)}
                 </span>
+                {!isCorrectNetwork && (
+                  <Button onClick={switchToCorrectNetwork} variant="danger" size="sm">
+                    Switch Network
+                  </Button>
+                )}
                 <Button onClick={disconnectWallet} variant="outline" size="sm">
                   Disconnect
                 </Button>
@@ -69,13 +87,18 @@ const Header = () => {
         {mobileMenuOpen && (
           <div className="md:hidden mt-4 pb-4 space-y-3 animate-slide-down">
             <div className="flex justify-center mb-3">
-              <Badge variant="info">Cronos Testnet</Badge>
+              {getNetworkBadge()}
             </div>
             {account ? (
               <div className="space-y-2">
                 <div className="text-white bg-gray-700/50 px-4 py-2 rounded-lg text-center border border-gray-600">
                   {truncateAddress(account)}
                 </div>
+                {!isCorrectNetwork && (
+                  <Button onClick={switchToCorrectNetwork} variant="danger" fullWidth>
+                    Switch to Cronos Testnet
+                  </Button>
+                )}
                 <Button onClick={disconnectWallet} variant="outline" fullWidth>
                   Disconnect
                 </Button>

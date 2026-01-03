@@ -53,7 +53,7 @@ interface ActivityEvent {
 }
 
 export const DeviceModal = ({ isOpen, onClose, device }: DeviceModalProps) => {
-  const { account, provider } = useWallet();
+  const { account, provider, isCorrectNetwork, switchToCorrectNetwork } = useWallet();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -136,6 +136,17 @@ export const DeviceModal = ({ isOpen, onClose, device }: DeviceModalProps) => {
   const handleStartStream = async () => {
     if (!provider || !account || !device) {
       showToast('Please connect your wallet', 'warning');
+      return;
+    }
+
+    // Check if on correct network
+    if (!isCorrectNetwork) {
+      showToast('Please switch to Cronos Testnet to start a stream', 'error');
+      try {
+        await switchToCorrectNetwork();
+      } catch (err) {
+        console.error("Network switch cancelled or failed", err);
+      }
       return;
     }
 
