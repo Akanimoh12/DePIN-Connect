@@ -157,6 +157,19 @@ const Dashboard = () => {
       const tx = await contract.registerDevice(deviceId, dataSchema);
       await tx.wait();
       
+      // Cache the device ID in localStorage for Marketplace discovery
+      try {
+        const cachedDevices = localStorage.getItem('depin_registered_devices');
+        const deviceList = cachedDevices ? JSON.parse(cachedDevices) : [];
+        if (!deviceList.includes(deviceId)) {
+          deviceList.push(deviceId);
+          localStorage.setItem('depin_registered_devices', JSON.stringify(deviceList));
+          console.log('Cached device ID for marketplace:', deviceId);
+        }
+      } catch (e) {
+        console.error('Error caching device ID:', e);
+      }
+      
       showToast('Device registered successfully!', 'success');
       setDeviceId('');
       setDataSchema('');

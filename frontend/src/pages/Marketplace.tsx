@@ -44,6 +44,7 @@ const Marketplace = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [totalDevices, setTotalDevices] = useState(0);
   const [activeStreams, setActiveStreams] = useState(0);
+  const [hasFetched, setHasFetched] = useState(false); // Prevent multiple fetches
 
   // Set page title
   useEffect(() => {
@@ -52,7 +53,7 @@ const Marketplace = () => {
 
   // Fetch devices from contract
   const fetchDevices = async () => {
-    if (!provider) return;
+    if (!provider || isLoading) return;
 
     setIsLoading(true);
     try {
@@ -63,95 +64,106 @@ const Marketplace = () => {
       );
 
       const total = await contract.totalDevices();
-      setTotalDevices(Number(total));
+      const totalCount = Number(total);
+      setTotalDevices(totalCount);
 
-      // Fetch devices using events (production approach)
+      console.log(`Total devices registered: ${totalCount}`);
+
+      if (totalCount === 0) {
+        setDevices([]);
+        setIsLoading(false);
+        return;
+      }
+
       const devicesList: Device[] = [];
-      
+      const deviceIds = new Set<string>();
+
+      // Query ALL events from contract deployment in safe chunks
       try {
-        // Query DeviceRegistered events from the past (last 100,000 blocks)
         const currentBlock = await provider.getBlockNumber();
-        const fromBlock = Math.max(0, currentBlock - 100000);
+        // Contract deployed around block 65960000, start from there
+        const DEPLOYMENT_BLOCK = 65960000;
+        const CHUNK_SIZE = 1999; // Under 2000 block limit
+        
+        console.log(`Scanning blocks ${DEPLOYMENT_BLOCK} to ${currentBlock} for devices...`);
         
         const filter = contract.filters.DeviceRegistered();
-        const events = await contract.queryFilter(filter, fromBlock, 'latest');
         
-        console.log(`Found ${events.length} DeviceRegistered events`);
-        
-        // Get unique device IDs from events
-        const deviceIds = new Set<string>();
-        events.forEach((event: any) => {
-          if (event.args && event.args.deviceId) {
-            deviceIds.add(event.args.deviceId);
+        // Query in chunks
+        for (let fromBlock = DEPLOYMENT_BLOCK; fromBlock <= currentBlock; fromBlock += CHUNK_SIZE) {
+          const toBlock = Math.min(fromBlock + CHUNK_SIZE - 1, currentBlock);
+          
+          try {
+            const events = await contract.queryFilter(filter, fromBlock, toBlock);
+            
+            events.forEach((event: any) => {
+              if (event.args) {
+                const deviceId = event.args[0] || event.args.deviceId;
+                if (deviceId) {
+                  deviceIds.add(deviceId);
+                }
+              }
+            });
+            
+            // Small delay to avoid rate limiting
+            if (fromBlock + CHUNK_SIZE <= currentBlock) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+          } catch (chunkError: any) {
+            console.error(`Error in chunk ${fromBlock}-${toBlock}:`, chunkError.message);
           }
-        });
+        }
         
-        // Fetch current data for each device
+        console.log(`Found ${deviceIds.size} unique device(s) from events`);
+      } catch (eventError: any) {
+        console.error('Error querying events:', eventError.message);
+      }
+
+      // Fetch data for each device
+      if (deviceIds.size > 0) {
+        console.log(`Loading details for ${deviceIds.size} device(s)...`);
+        
         for (const deviceId of deviceIds) {
           try {
             const deviceData = await contract.getDevice(deviceId);
-            if (deviceData.owner !== ethers.ZeroAddress) {
+            
+            if (deviceData[0] !== ethers.ZeroAddress) {
               devicesList.push({
                 deviceId,
-                owner: deviceData.owner,
-                dataSchema: deviceData.dataSchema,
-                isActive: deviceData.isActive,
-                registeredAt: Number(deviceData.registeredAt),
+                owner: deviceData[0],
+                dataSchema: deviceData[1],
+                isActive: deviceData[2],
+                registeredAt: Number(deviceData[3]),
                 coordinates: getRandomCoordinates(),
                 activeSubscribers: Math.floor(Math.random() * 10),
-                price: '1000000000000000', // 0.001 CRO/sec
+                price: '1000000000000000',
               });
             }
-          } catch (error) {
-            console.error(`Error fetching device ${deviceId}:`, error);
-          }
-        }
-      } catch (eventError) {
-        console.error('Error querying events, falling back to sample data:', eventError);
-        // Fallback: Try to fetch some hardcoded sample devices for testing
-        const sampleDeviceIds = ['weather-station-001', 'sensor-001', 'iot-device-001', 'air-quality-monitor', 'traffic-sensor'];
-        
-        for (const deviceId of sampleDeviceIds) {
-          try {
-            const deviceData = await contract.getDevice(deviceId);
-            if (deviceData.owner !== ethers.ZeroAddress) {
-              devicesList.push({
-                deviceId,
-                owner: deviceData.owner,
-                dataSchema: deviceData.dataSchema,
-                isActive: deviceData.isActive,
-                registeredAt: Number(deviceData.registeredAt),
-                coordinates: getRandomCoordinates(),
-                activeSubscribers: Math.floor(Math.random() * 10),
-                price: '1000000000000000', // 0.001 CRO/sec
-              });
-            }
-          } catch (error) {
-            // Device doesn't exist, skip
+          } catch (error: any) {
+            console.error(`Error loading device "${deviceId}":`, error.message);
           }
         }
       }
 
+      console.log(`Marketplace loaded: ${devicesList.length} device(s)`);
       setDevices(devicesList);
       
-      // Calculate active streams
       const activeCount = devicesList.filter(d => d.isActive).length;
       setActiveStreams(activeCount);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching devices:', error);
-      showToast('Failed to fetch devices', 'error');
+      showToast(`Failed to load devices: ${error.message}`, 'error');
     } finally {
       setIsLoading(false);
+      setHasFetched(true);
     }
   };
 
   useEffect(() => {
-    fetchDevices();
-    
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchDevices, 30000);
-    return () => clearInterval(interval);
-  }, [provider]);
+    if (provider && !hasFetched) {
+      fetchDevices();
+    }
+  }, [provider, hasFetched]);
 
   // Filter devices based on search
   const filteredDevices = devices.filter(device =>
@@ -275,6 +287,24 @@ const Marketplace = () => {
         </h2>
         
         <div className="flex items-center gap-3">
+          {/* Refresh Button */}
+          <Button
+            onClick={() => {
+              setHasFetched(false); // Allow refetch
+              showToast('Refreshing devices...', 'info');
+              fetchDevices();
+            }}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+            disabled={isLoading}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span className="hidden sm:inline">{isLoading ? 'Loading...' : 'Refresh'}</span>
+          </Button>
+          
           {/* View Toggle */}
           <div className="flex items-center gap-2 bg-gray-800/40 backdrop-blur-xl border border-gray-700/50 rounded-lg p-1">
             <button
