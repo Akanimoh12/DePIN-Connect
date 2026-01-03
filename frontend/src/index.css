@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-background text-white;
+}
+
+/* Leaflet custom marker styles */
+.custom-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Leaflet popup customization */
+.leaflet-popup-content-wrapper {
+  @apply bg-white rounded-xl shadow-2xl border border-gray-200;
+  padding: 0 !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  width: auto !important;
+}
+
+.leaflet-popup-tip {
+  @apply bg-white;
+}
+
+.custom-popup .leaflet-popup-close-button {
+  @apply text-gray-400 hover:text-gray-600;
+  font-size: 24px !important;
+  padding: 4px 8px !important;
+}
+
+/* Map marker animations */
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.custom-marker:hover {
+  animation: bounce 0.5s ease-in-out;
+}
+
+/* Marker cluster customization */
+.marker-cluster-small,
+.marker-cluster-medium,
+.marker-cluster-large {
+  @apply bg-indigo-600/80 backdrop-blur-sm;
+}
+
+.marker-cluster-small div,
+.marker-cluster-medium div,
+.marker-cluster-large div {
+  @apply bg-indigo-700/90 text-white font-bold;
+}
+

@@ -1,21 +1,50 @@
-import React from 'react';
-import MapView from './components/MapView';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import Header from './components/layout/Header';
+import Footer from './components/layout/Footer';
+import Sidebar from './components/layout/Sidebar';
 import { WalletProvider } from './contexts/WalletContext';
+import { ToastProvider } from './contexts/ToastContext';
+import LoadingSpinner from './components/ui/LoadingSpinner';
+import ErrorBoundary from './components/ErrorBoundary';
+
+// Lazy load pages for better performance
+const Marketplace = lazy(() => import('./pages/Marketplace'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const MySubscriptions = lazy(() => import('./pages/MySubscriptions'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 function App() {
   return (
-    <WalletProvider>
-      <div className="bg-gray-900 min-h-screen text-white">
-        <Header />
-        <main className="p-4">
-          {/* The main content will go here. For now, we can add a placeholder */}
-          <h1 className="text-2xl font-bold text-center text-blue-400 mb-8">Welcome to DePIN Connect</h1>
-          {/* We will uncomment this later when we build the MapView component */}
-          {/* <MapView /> */}
-        </main>
-      </div>
+    <ErrorBoundary>
+      <WalletProvider>
+        <ToastProvider>
+          <Router>
+          <div className="min-h-screen bg-background text-white">
+            <Header />
+            <div className="flex container mx-auto pt-8 px-6">
+              <Sidebar />
+              <main className="flex-1 lg:ml-8">
+                <Suspense fallback={
+                  <div className="flex items-center justify-center min-h-[60vh]">
+                    <LoadingSpinner size="lg" />
+                  </div>
+                }>
+                  <Routes>
+                    <Route path="/" element={<Marketplace />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/subscriptions" element={<MySubscriptions />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Suspense>
+              </main>
+            </div>
+            <Footer />
+          </div>
+        </Router>
+      </ToastProvider>
     </WalletProvider>
+    </ErrorBoundary>
   );
 }
 
