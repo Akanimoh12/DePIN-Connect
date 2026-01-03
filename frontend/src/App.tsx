@@ -12,6 +12,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 const Marketplace = lazy(() => import('./pages/Marketplace'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const MySubscriptions = lazy(() => import('./pages/MySubscriptions'));
+const PitchDeck = lazy(() => import('./pages/PitchDeck'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
                     <Route path="/" element={<Marketplace />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/subscriptions" element={<MySubscriptions />} />
+                    <Route path="/pitch" element={<PitchDeck />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Suspense>

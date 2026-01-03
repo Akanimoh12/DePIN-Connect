@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { HomeIcon, RectangleStackIcon, BoltIcon } from '@heroicons/react/24/outline';
+import { HomeIcon, RectangleStackIcon, BoltIcon, PresentationChartLineIcon } from '@heroicons/react/24/outline';
 import { useWallet } from '../../contexts/WalletContext';
 import Badge from '../ui/Badge';
 
@@ -31,6 +31,7 @@ const Sidebar = () => {
     { name: 'Marketplace', href: '/', icon: HomeIcon },
     { name: 'Dashboard', href: '/dashboard', icon: RectangleStackIcon },
     { name: 'My Subscriptions', href: '/subscriptions', icon: BoltIcon, badge: activeCount },
+    { name: 'Pitch Deck', href: '/pitch', icon: PresentationChartLineIcon },
   ];
   
   return (
